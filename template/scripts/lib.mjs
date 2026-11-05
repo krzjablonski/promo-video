@@ -1,9 +1,11 @@
 import { existsSync } from 'node:fs';
 import { homedir } from 'node:os';
-import { join } from 'node:path';
+import { delimiter, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { CUTS, CUT_IDS, SLUG, VOICE, elevenLabsText, spokenText } from '../src/script.ts';
 
-export const ROOT = new URL('..', import.meta.url).pathname;
+// fileURLToPath, not `.pathname`: on Windows `.pathname` gives "/C:/…", which breaks every path.
+export const ROOT = fileURLToPath(new URL('..', import.meta.url));
 export const PUBLIC = join(ROOT, 'public');
 
 /** whisper.cpp build + model, shared by every promo-video project on this machine. */
@@ -48,9 +50,40 @@ export const flagValue = (name, fallback) => {
   return i > -1 && process.argv[i + 1] ? process.argv[i + 1] : fallback;
 };
 
-/** ffmpeg: the system one if installed, else the copy bundled with Remotion. */
-export const ffmpeg = () => (existsSync('/opt/homebrew/bin/ffmpeg') ? ['/opt/homebrew/bin/ffmpeg'] : existsSync('/usr/local/bin/ffmpeg') ? ['/usr/local/bin/ffmpeg'] : existsSync('/usr/bin/ffmpeg') ? ['/usr/bin/ffmpeg'] : ['npx', 'remotion', 'ffmpeg']);
-export const ffprobe = () => (existsSync('/opt/homebrew/bin/ffprobe') ? ['/opt/homebrew/bin/ffprobe'] : existsSync('/usr/local/bin/ffprobe') ? ['/usr/local/bin/ffprobe'] : existsSync('/usr/bin/ffprobe') ? ['/usr/bin/ffprobe'] : ['npx', 'remotion', 'ffprobe']);
+/**
+ * The Remotion command-line tool, started with this same Node. Not `npx remotion`: on Windows `npx`
+ * is a .cmd file, and Node cannot start a .cmd file without a shell.
+ */
+export const REMOTION_CLI = [process.execPath, join(ROOT, 'node_modules', '@remotion', 'cli', 'remotion-cli.js')];
+
+/** On Windows, `npm ci` installs Remotion's own ffmpeg.exe and ffprobe.exe in this folder. */
+const REMOTION_WIN_BIN = join(ROOT, 'node_modules', '@remotion', 'compositor-win32-x64-msvc');
+
+/** First file called `name` (`name.exe` on Windows) in one of the PATH folders, or null. */
+const onPath = (name) => {
+  const file = process.platform === 'win32' ? `${name}.exe` : name;
+  for (const dir of (process.env.PATH ?? '').split(delimiter)) {
+    if (dir && existsSync(join(dir, file))) return join(dir, file);
+  }
+  return null;
+};
+
+/**
+ * ffmpeg / ffprobe: the system one if installed (it has every filter), else the copy bundled with
+ * Remotion. Returns [program, ...first arguments].
+ */
+const tool = (name) => {
+  for (const dir of ['/opt/homebrew/bin', '/usr/local/bin', '/usr/bin']) {
+    if (existsSync(`${dir}/${name}`)) return [`${dir}/${name}`];
+  }
+  const system = onPath(name);
+  if (system) return [system];
+  const bundledExe = join(REMOTION_WIN_BIN, `${name}.exe`);
+  if (process.platform === 'win32' && existsSync(bundledExe)) return [bundledExe];
+  return [...REMOTION_CLI, name];
+};
+export const ffmpeg = () => tool('ffmpeg');
+export const ffprobe = () => tool('ffprobe');
 
 const ONES = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten',
   'eleven', 'twelve', 'thirteen', 'fourteen', 'fifteen', 'sixteen', 'seventeen', 'eighteen', 'nineteen'];

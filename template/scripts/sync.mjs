@@ -13,11 +13,17 @@ import { existsSync, mkdtempSync, readdirSync, rmSync, statSync, writeFileSync }
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { downloadWhisperModel, installWhisperCpp, toCaptions, transcribe } from '@remotion/install-whisper-cpp';
-import { CUTS, ROOT, WHISPER_DIR, ffmpeg, hasFlag, parseCutsArg, pauseAfter, scriptWords, transcriptKeys } from './lib.mjs';
+import { CUTS, ROOT, VOICE, WHISPER_DIR, ffmpeg, hasFlag, parseCutsArg, pauseAfter, scriptWords, transcriptKeys } from './lib.mjs';
 
 // 1.5.5 is the last whisper.cpp release that builds with plain `make`; 1.7.4+ needs cmake.
+// (On Windows nothing is built: a ready-made whisper.cpp is downloaded.)
 const WHISPER_VERSION = '1.5.5';
-const WHISPER_MODEL = 'base.en';
+// Language of the voiceover: VOICE.language in src/script.ts (e.g. 'pl'), default English.
+// PROMO_WHISPER_LANGUAGE / PROMO_WHISPER_MODEL override both for one run.
+const WHISPER_LANGUAGE = process.env.PROMO_WHISPER_LANGUAGE ?? VOICE.language ?? 'en';
+// base.en knows English only. For other languages, 'small' is multilingual and aligned a Polish
+// take at 98%; it is a bigger one-time download (~470 MB).
+const WHISPER_MODEL = process.env.PROMO_WHISPER_MODEL ?? (WHISPER_LANGUAGE === 'en' ? 'base.en' : 'small');
 
 const findAudio = (cut) => {
   // a format copy (e.g. vertical) of another cut uses that cut's recording
@@ -152,9 +158,21 @@ const transcribeAudio = async (audioRel) => {
       whisperCppVersion: WHISPER_VERSION,
       model: WHISPER_MODEL,
       tokenLevelTimestamps: true,
+      language: WHISPER_LANGUAGE,
       printOutput: false,
     });
-    const { captions } = toCaptions({ whisperCppOutput: output });
+    const { captions: tokens } = toCaptions({ whisperCppOutput: output });
+    // whisper splits words into pieces (" Pr" + "anie", " re" + "typing"). A piece with no space in
+    // front continues the word before it, so glue the pieces back into whole words. Without this a
+    // Polish take aligned only ~45% of the script; with it, 98%.
+    const captions = [];
+    for (const token of tokens) {
+      const last = captions[captions.length - 1];
+      if (last && !/^\s/.test(token.text)) {
+        last.text += token.text;
+        last.endMs = token.endMs;
+      } else captions.push({ ...token });
+    }
     const transcript = captions.flatMap((c) => {
       const keys = transcriptKeys(c.text);
       const span = (c.endMs - c.startMs) / 1000 / Math.max(1, keys.length);
@@ -189,7 +207,7 @@ const syncCut = async (cut) => {
   let silences = [];
 
   if (audio) {
-    console.log(`[${cut}] Transcribing public/${audio} with whisper.cpp ${WHISPER_VERSION} (${WHISPER_MODEL})…`);
+    console.log(`[${cut}] Transcribing public/${audio} with whisper.cpp ${WHISPER_VERSION} (${WHISPER_MODEL}, language: ${WHISPER_LANGUAGE})…`);
     const result = await transcribeAudio(audio);
     const { times: al, matched } = align(words, result.transcript);
     duration = result.duration;
@@ -199,7 +217,7 @@ const syncCut = async (cut) => {
     aligned = Math.round((matched / words.length) * 1000) / 1000;
     console.log(`[${cut}] Aligned ${matched}/${words.length} script words (${Math.round(aligned * 100)}%).`);
     if (aligned < 0.7) {
-      console.warn(`[${cut}] ⚠ Under 70% of the script was recognised. Check the audio is this cut, read from the current src/script.ts.`);
+      console.warn(`[${cut}] ⚠ Under 70% of the script was recognised. Check the audio is this cut, read from the current src/script.ts, and that VOICE.language in src/script.ts is the language of the take (now: ${WHISPER_LANGUAGE}).`);
     }
   } else {
     console.log(hasFlag('estimate') ? `[${cut}] Estimating timings from the script.` : `[${cut}] No public/voiceover/${cut}.(mp3|wav|m4a) or ${cut}.guide.mp3 — estimating timings (silent).`);

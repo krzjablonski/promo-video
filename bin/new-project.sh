@@ -22,4 +22,4 @@ if [ "$NODE_MAJOR" -lt 22 ] || { [ "$NODE_MAJOR" -eq 22 ] && [ "$NODE_MINOR" -lt
   echo "⚠ Node $(node -v): the scripts import TypeScript directly and need Node 22.18+." >&2
 fi
 command -v ffmpeg >/dev/null || echo "⚠ No system ffmpeg; scripts fall back to Remotion's bundled copy."
-[ -x "${PROMO_WHISPER_DIR:-$HOME/.cache/promo-video/whisper}/main" ] || echo "· whisper.cpp is not built yet; the first 'npm run sync' builds it (~1 min, needs git + make)."
+[ -x "${PROMO_WHISPER_DIR:-$HOME/.cache/promo-video/whisper}/main" ] || echo "· whisper.cpp is not built yet; the first 'npm run sync' builds it (~1 min, needs git + make; on Windows it downloads a ready-made copy)."

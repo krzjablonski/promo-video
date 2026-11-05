@@ -22,7 +22,8 @@ export interface CutTimings {
   silences?: [number, number][];
 }
 
-export const TIMINGS = GENERATED as Record<string, CutTimings>;
+// Through `unknown`: TypeScript reads "silences" in the JSON as number[][], not [number, number][].
+export const TIMINGS = GENERATED as unknown as Record<string, CutTimings>;
 
 /** Fails loudly when src/script.ts was edited without re-running the sync. */
 export const assertTimingsMatchScript = (cut: CutId): void => {

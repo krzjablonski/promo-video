@@ -68,6 +68,11 @@ export const VOICE = {
   similarity: 0.75,
   /** Fix once a take is liked, so re-generated lines keep the same read. */
   seed: null as number | null,
+  /**
+   * Language of the voiceover, as a two-letter code: 'en', 'pl', 'de'… `npm run sync` uses it to
+   * recognise the words. Not English → a multilingual speech model (bigger first download).
+   */
+  language: 'en',
 };
 
 /** Output file stem: out/<SLUG>-<cut>.mp4 */

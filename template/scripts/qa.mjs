@@ -54,7 +54,8 @@ const qaCut = (cut) => {
   mkdirSync(dir, { recursive: true });
 
   const duration = Number(execFileSync(fp, [...fpPre, '-v', 'error', '-show_entries', 'format=duration', '-of', 'csv=p=0', video], { encoding: 'utf8' }).trim());
-  const loud = spawnSync(ff, [...ffPre, '-hide_banner', '-i', video, '-af', 'loudnorm=print_format=json', '-f', 'null', '-'], { encoding: 'utf8' }).stderr ?? '';
+  // -vn: measure the sound only. Without it the ffmpeg bundled with Remotion prints no loudness.
+  const loud = spawnSync(ff, [...ffPre, '-hide_banner', '-i', video, '-vn', '-af', 'loudnorm=print_format=json', '-f', 'null', '-'], { encoding: 'utf8' }).stderr ?? '';
   let lufs = null;
   try {
     lufs = Number(JSON.parse(loud.slice(loud.lastIndexOf('{'), loud.lastIndexOf('}') + 1)).input_i);
@@ -62,12 +63,23 @@ const qaCut = (cut) => {
 
   const grab = (sec, file) =>
     execFileSync(ff, [...ffPre, '-y', '-loglevel', 'error', '-ss', String(Math.max(0, Math.min(sec, duration - 0.05))), '-i', video, '-frames:v', '1', '-vf', 'scale=640:-2', join(dir, file)]);
-  /** Tiles numbered frames (prefixNN.jpg, from `first`) into one image, 4 per row. */
+  /**
+   * Tiles numbered frames (prefixNN.jpg, from `first`) into one image, 4 per row. Returns false when
+   * this ffmpeg has no `tile` filter (the copy bundled with Remotion on Windows): the single frames
+   * are still there to look at.
+   */
+  let noTile = false;
   const sheet = (prefix, first, count, out) => {
-    if (!count) return;
+    if (!count || noTile) return false;
     const cols = Math.min(4, count);
     const rows = Math.ceil(count / cols);
-    execFileSync(ff, [...ffPre, '-y', '-loglevel', 'error', '-framerate', '1', '-start_number', String(first), '-i', join(dir, `${prefix}%02d.jpg`), '-vf', `tile=${cols}x${rows}:padding=6:color=white`, '-frames:v', '1', join(dir, out)]);
+    const made = spawnSync(ff, [...ffPre, '-y', '-loglevel', 'error', '-framerate', '1', '-start_number', String(first), '-i', join(dir, `${prefix}%02d.jpg`), '-vf', `tile=${cols}x${rows}:padding=6:color=white`, '-frames:v', '1', join(dir, out)], { encoding: 'utf8' });
+    if (made.status === 0) return true;
+    if (/tile/i.test(made.stderr ?? '')) {
+      noTile = true;
+      return false;
+    }
+    throw new Error(`ffmpeg could not make ${out}:\n${made.stderr ?? made.error}`);
   };
 
   // scene windows: a scene is replaced LEAD s before the next scene's first word, crossfading
@@ -122,9 +134,9 @@ const qaCut = (cut) => {
   const cueSheets = [];
   for (let first = 1, k = 1; first <= c; first += PER_SHEET, k++) {
     const name = k === 1 ? 'cues.jpg' : `cues-${k}.jpg`;
-    sheet('c', first, Math.min(PER_SHEET, c - first + 1), name);
-    cueSheets.push(name);
+    if (sheet('c', first, Math.min(PER_SHEET, c - first + 1), name)) cueSheets.push(name);
   }
+  if (noTile) warnings.push('no contact sheets: this ffmpeg has no tile filter (install the full ffmpeg to get them) — look at the single frames s01.jpg, c01.jpg… instead');
 
   const isGuide = t.audio && t.audio.includes('.guide.');
   if (lufs !== null && !isGuide && (lufs < -18 || lufs > -13)) warnings.push(`loudness ${lufs.toFixed(1)} LUFS is outside −13…−18: re-import the take with npm run vo:import`);
@@ -141,7 +153,9 @@ const qaCut = (cut) => {
     `loudness   ${lufs === null ? 'n/a' : `${lufs.toFixed(1)} LUFS`}`,
     `timing     ${t.source}${t.aligned ? `, ${Math.round(t.aligned * 100)}% of script words aligned` : ''}`,
     `audio      ${t.audio ?? 'none'}`,
-    `sheets     ${rel}/sheet.jpg (${sectionCount} sections)${cueSheets.length ? `, ${cueSheets.map((x) => `${rel}/${x}`).join(', ')} (${c} cues)` : ''}`,
+    noTile
+      ? `frames     ${rel}/s01.jpg … (${sectionCount} sections)${c ? `, ${rel}/c01.jpg … (${c} cues)` : ''}`
+      : `sheets     ${rel}/sheet.jpg (${sectionCount} sections)${cueSheets.length ? `, ${cueSheets.map((x) => `${rel}/${x}`).join(', ')} (${c} cues)` : ''}`,
     ...warnings.map((w) => `⚠ ${w}`),
     '',
   ];
@@ -150,4 +164,4 @@ const qaCut = (cut) => {
 };
 
 for (const cut of parseCutsArg()) qaCut(cut);
-console.log('Inspect every sheet listed above with the Read tool.');
+console.log('Inspect every sheet (or frame) listed above with the Read tool.');

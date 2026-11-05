@@ -16,7 +16,7 @@ npm run check                   # lint script, cues, props, assets, length
 npm run script -- <cut>         # ElevenLabs-ready text + voice settings
 npm run vo:guide                # robotic guide voice (macOS) for previews
 npm run vo:import -- <cut> <file.mp3>   # normalise a take to −16 LUFS → public/voiceover/<cut>.mp3
-npm run sync [-- <cut>]         # whisper.cpp alignment → src/timings/<cut>.json
+npm run sync [-- <cut>]         # whisper.cpp alignment → src/timings/<cut>.json (language: VOICE.language)
 npm run render [-- <cut>] [--draft]     # → out/<slug>-<cut>.mp4
 npm run qa -- <cut> [--draft]   # contact sheets + loudness/alignment report in .qa/<cut>/
 ```

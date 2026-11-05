@@ -3,7 +3,7 @@
 import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { join } from 'node:path';
-import { CUTS, ROOT, SLUG, hasFlag, parseCutsArg } from './lib.mjs';
+import { CUTS, REMOTION_CLI, ROOT, SLUG, hasFlag, parseCutsArg } from './lib.mjs';
 
 const draft = hasFlag('draft');
 for (const cut of parseCutsArg()) {
@@ -13,5 +13,6 @@ for (const cut of parseCutsArg()) {
   }
   const out = `out/${SLUG}-${cut}${draft ? '.draft' : ''}.mp4`;
   console.log(`[${cut}] rendering ${CUTS[cut].composition} → ${out}`);
-  execFileSync('npx', ['remotion', 'render', CUTS[cut].composition, out, ...(draft ? ['--scale=0.5', '--crf=26'] : [])], { cwd: ROOT, stdio: 'inherit' });
+  const [node, ...cli] = REMOTION_CLI; // not `npx`, so it also runs on Windows
+  execFileSync(node, [...cli, 'render', CUTS[cut].composition, out, ...(draft ? ['--scale=0.5', '--crf=26'] : [])], { cwd: ROOT, stdio: 'inherit' });
 }

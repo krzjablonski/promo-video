@@ -34,8 +34,12 @@ In any project: `/promo-video`, or just ask Claude for a promo/explainer video.
 - Node 22.18+ and npm
 - ffmpeg (falls back to Remotion's bundled copy)
 - `git` + `make` — the first `npm run sync` builds whisper.cpp into `~/.cache/promo-video/whisper`
-  (~1 minute, shared by all projects)
-- macOS for the robotic preview voice (`say`); elsewhere previews use estimated timing
+  (~1 minute, shared by all projects). On Windows no `make` is needed: a ready-made whisper.cpp
+  is downloaded instead
+- macOS for the robotic preview voice (`say`); elsewhere (Windows, Linux) previews use estimated
+  timing
+- Voiceover in English by default. For another language set `VOICE.language` in `src/script.ts`
+  (e.g. `'pl'`): `npm run sync` then uses the multilingual whisper model `small` (~470 MB, once)
 - An ElevenLabs account. If your Claude session has an ElevenLabs MCP server/connector, Claude asks
   whether to generate the takes through it; otherwise it gives you the v4 text and settings per
   cut, you generate the take in elevenlabs.io and hand over the MP3 (no API key needed either way)

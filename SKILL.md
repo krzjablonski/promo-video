@@ -113,7 +113,8 @@ Then:
    product screen (which real screen, which moment), mechanism, or library connective tissue.
    Write that plan into `brief.md` (a table: section → scene → custom/library → what it shows).
    At least a world opener and two product screens are custom (references/custom-scenes.md).
-1. Write `src/script.ts` `CUTS` (and `VOICE`): sections with ElevenLabs-ready text, a scene and
+1. Write `src/script.ts` `CUTS` (and `VOICE`; set `VOICE.language` to the voiceover's language code,
+   e.g. `'pl'`, when it is not English, or `sync` cannot align the take): sections with ElevenLabs-ready text, a scene and
    props each, cues on the nouns the picture shows. Follow `references/script-writing.md`.
    Props of consecutive same-scene sections merge shallowly: put list props (`items`, `steps`,
    `people`…) once in the scene's first section; use `break: true` for a separate shot.
@@ -229,7 +230,9 @@ Takes generated: connector | by hand in elevenlabs.io
 | Text overflows / overlaps | Shorten on-screen text (2–6 words); fewer items; check portrait separately. |
 | Timings stale error in render | Script changed after sync → re-guide/re-record, `npm run sync`. |
 | Low alignment with a real take | Take doesn't match the script, or a tag was read aloud. Regenerate. |
-| whisper build fails | Needs `git` + `make` (Xcode CLT on macOS). Or `npm run sync -- --estimate` meanwhile. |
+| whisper build fails | Needs `git` + `make` (Xcode CLT on macOS; Windows downloads a ready-made build, no `make`). Or `npm run sync -- --estimate` meanwhile. |
+| Low alignment, take not in English | Set `VOICE.language` in `src/script.ts` (e.g. `'pl'`) → `npm run sync` uses the multilingual model. |
+| QA: "no contact sheets" | The ffmpeg bundled with Remotion (Windows) has no `tile` filter. Read the single frames `s01.jpg`, `c01.jpg`… instead, or install the full ffmpeg. |
 | Font/logo looks wrong | `brand.ts` font import; logo PNG must have transparent background. |
 
 ## Licensing

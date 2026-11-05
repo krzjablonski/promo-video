@@ -19,11 +19,12 @@ const lufs = Number(flagValue('lufs', '-16'));
 const [bin, ...pre] = ffmpeg();
 const out = join(ROOT, 'public', 'voiceover', `${cut}.mp3`);
 
-// pass 1: measure (loudnorm prints its JSON report on stderr)
-const run = spawnSync(bin, [...pre, '-hide_banner', '-i', resolve(src), '-af', `loudnorm=I=${lufs}:TP=-1.5:LRA=11:print_format=json`, '-f', 'null', '-'], { encoding: 'utf8' });
+// pass 1: measure (loudnorm prints its JSON report on stderr). -vn: sound only, so a cover picture
+// in the file cannot stop the ffmpeg bundled with Remotion (it has no picture encoders).
+const run = spawnSync(bin, [...pre, '-hide_banner', '-i', resolve(src), '-vn', '-af', `loudnorm=I=${lufs}:TP=-1.5:LRA=11:print_format=json`, '-f', 'null', '-'], { encoding: 'utf8' });
 const log = run.stderr ?? '';
 const m = JSON.parse(log.slice(log.lastIndexOf('{'), log.lastIndexOf('}') + 1));
 // pass 2: apply with measured values (linear, so timing and dynamics are preserved)
 const filter = `loudnorm=I=${lufs}:TP=-1.5:LRA=11:measured_I=${m.input_i}:measured_TP=${m.input_tp}:measured_LRA=${m.input_lra}:measured_thresh=${m.input_thresh}:offset=${m.target_offset}:linear=true`;
-execFileSync(bin, [...pre, '-y', '-loglevel', 'error', '-i', resolve(src), '-af', filter, '-ar', '44100', '-ac', '1', '-b:a', '192k', out], { stdio: 'inherit' });
+execFileSync(bin, [...pre, '-y', '-loglevel', 'error', '-i', resolve(src), '-vn', '-af', filter, '-ar', '44100', '-ac', '1', '-b:a', '192k', out], { stdio: 'inherit' });
 console.log(`[${cut}] ${src} → public/voiceover/${cut}.mp3 (was ${m.input_i} LUFS, now ~${lufs}). Next: npm run sync -- ${cut}`);
